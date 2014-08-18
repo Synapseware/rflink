@@ -44,8 +44,14 @@
 #----------------------------------------------------------------------------
 
 
+# Build variables
+SAMPLE_RATE = 2048
+MAX_EVENT_RECORDS = 8
+BAUD = 1200
+
+
 # MCU name
-MCU = atmega328p
+MCU = atmega168
 
 # Fuse values
 L_FUSE = 0xFF
@@ -54,23 +60,6 @@ E_FUSE = 0xFE
 
 
 # Processor frequency.
-#     This will define a symbol, F_CPU, in all source code files equal to the 
-#     processor frequency. You can then use this symbol in your source code to 
-#     calculate timings. Do NOT tack on a 'UL' at the end, this will be done
-#     automatically to create a 32-bit value in your source code.
-#     Typical values are:
-#         F_CPU =  1000000
-#         F_CPU =  1843200
-#         F_CPU =  2000000
-#         F_CPU =  3686400
-#         F_CPU =  4000000
-#         F_CPU =  7372800
-#         F_CPU =  8000000
-#         F_CPU = 11059200
-#         F_CPU = 14745600
-#         F_CPU = 16000000
-#         F_CPU = 18432000
-#         F_CPU = 20000000
 F_CPU = 14745600
 
 
@@ -89,21 +78,14 @@ OBJDIR = .
 
 
 # Shared source code
-SHARED = ../libs
-
-
-# Define UART BAUD rate
-BAUD = 9600
-EVENT_RATE = 2016
-MAX_EVENT_RECORDS = 4
+SHARED = ../../libs
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c								\
-	$(SHARED)/drivers/mma7260/mma7260.c			\
-	$(SHARED)/events/events.c					\
-	$(SHARED)/uart/uart.c						\
-	$(SHARED)/utils.c
+SRC =	$(TARGET).c                          \
+	 	$(SHARED)/events/events.c            \
+	 	$(SHARED)/utils.c                    \
+	 	$(SHARED)/uart/uart.c
 
 
 # List library files here
@@ -142,7 +124,7 @@ DEBUG = dwarf-2
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRAINCDIRS = ../ $(SHARED)
+EXTRAINCDIRS = $(SHARED)
 
 
 # Compiler flag to set the C Standard level.
@@ -153,41 +135,11 @@ EXTRAINCDIRS = ../ $(SHARED)
 CSTANDARD = -std=gnu99
 
 
-# Variable declarations
-EVENT_RATE = 2048
-BAUD = 57600
-MAX_EVENT_RECORDS = 8
-ACCEL_AXIS_X_PORT = PORTC2
-ACCEL_AXIS_Y_PORT = PORTC1
-ACCEL_AXIS_Z_PORT = PORTC0
-ACCEL_AXIS_X_ADC = ADC2D
-ACCEL_AXIS_Y_ADC = ADC1D
-ACCEL_AXIS_Z_ADC = ADC0D
-ACCEL_CTL_DDR = DDRD
-ACCEL_CTL_PORT = PORTD
-ACCEL_CTL_GAIN1 = PORTD2
-ACCEL_CTL_GAIN2 = PORTD3
-ACCEL_CTL_SLEEP = PORTD4
-ACCEL_GAIN_MODE = G1_5
-
-
 # Place -D or -U options here for C sources
 CDEFS = -DF_CPU=$(F_CPU)UL
-CDEFS += -DBAUD=$(BAUD)
 CDEFS += -DMAX_EVENT_RECORDS=$(MAX_EVENT_RECORDS)
-CDEFS += -DSAMPLE_RATE=$(EVENT_RATE)
-CDEFS += -DACCEL_AXIS_X_PORT=$(ACCEL_AXIS_X_PORT)
-CDEFS += -DACCEL_AXIS_Y_PORT=$(ACCEL_AXIS_Y_PORT)
-CDEFS += -DACCEL_AXIS_Z_PORT=$(ACCEL_AXIS_Z_PORT)
-CDEFS += -DACCEL_AXIS_X_ADC=$(ACCEL_AXIS_X_ADC)
-CDEFS += -DACCEL_AXIS_Y_ADC=$(ACCEL_AXIS_Y_ADC)
-CDEFS += -DACCEL_AXIS_Z_ADC=$(ACCEL_AXIS_Z_ADC)
-CDEFS += -DACCEL_CTL_DDR=$(ACCEL_CTL_DDR)
-CDEFS += -DACCEL_CTL_PORT=$(ACCEL_CTL_PORT)
-CDEFS += -DACCEL_CTL_GAIN1=$(ACCEL_CTL_GAIN1)
-CDEFS += -DACCEL_CTL_GAIN2=$(ACCEL_CTL_GAIN2)
-CDEFS += -DACCEL_CTL_SLEEP=$(ACCEL_CTL_SLEEP)
-CDEFS += -DACCEL_GAIN_MODE=$(ACCEL_GAIN_MODE)
+CDEFS += -DSAMPLE_RATE=$(SAMPLE_RATE)
+CDEFS += -DBAUD=$(BAUD)
 # Place -D or -U options here for ASM sources
 ADEFS = -DF_CPU=$(F_CPU)
 
@@ -272,7 +224,7 @@ PRINTF_LIB_MIN = -Wl,-u,vfprintf -lprintf_min
 PRINTF_LIB_FLOAT = -Wl,-u,vfprintf -lprintf_flt
 
 # If this is left blank, then it will use the Standard printf version.
-PRINTF_LIB = 
+PRINTF_LIB = $(PRINTF_LIB_MIN)
 #PRINTF_LIB = $(PRINTF_LIB_MIN)
 #PRINTF_LIB = $(PRINTF_LIB_FLOAT)
 
@@ -336,7 +288,7 @@ LDFLAGS += $(LIBS)
 AVRDUDE_PROGRAMMER = stk500
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = com6    # programmer connected to serial device
+AVRDUDE_PORT = com1    # programmer connected to serial device
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
