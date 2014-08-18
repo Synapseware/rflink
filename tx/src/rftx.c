@@ -103,12 +103,12 @@ uint8_t lastLightLevel(void)
 
 // --------------------------------------------------------------------------------
 // Read ADC for battery voltage on channel 1
-uint8_t lastBatteryLevel(void)
+double lastBatteryLevel(void)
 {
 	uint8_t adc = readChannel(1);
-	double result = ((1.1 * adc) / 1024.0) * 23.5;
+	double result = 1.1 * adc / 1024.0;
 
-	return (uint8_t)result;
+	return result;
 }
 
 // --------------------------------------------------------------------------------
@@ -122,7 +122,10 @@ void formatMessage(void)
 	_buff[4]	= '\n';
 	_buff[5]	= 0;
 */
-	sprintf(_buff, "h %d %d", lastLightLevel(), lastBatteryLevel());
+	uint8_t light = lastLightLevel();
+	double battery = lastBatteryLevel();
+
+	sprintf(_buff, "h %d %.2f ", light, battery);
 }
 
 // --------------------------------------------------------------------------------
