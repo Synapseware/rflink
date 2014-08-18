@@ -1,7 +1,7 @@
 #include "rftx.h"
 
 
-volatile char _buff[64];
+static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
 
 
@@ -25,7 +25,7 @@ void init_adc(void)
 	// prepare ADC
 	ADMUX =	(1<<REFS1) |
 			(1<<REFS0) |
-			(1<<ADLAR);			// left adjust (ADCH has the most-significant 8 bits)
+			(0<<ADLAR);		// right adjust result
 
 	// setup
 	ADCSRA = (1<<ADEN) |
@@ -84,31 +84,37 @@ void setAdcChannel(uint8_t channel)
 
 // --------------------------------------------------------------------------------
 // Reads the ADC value for the specified channel
-uint8_t readChannel(uint8_t channel)
+uint16_t readChannel(uint8_t channel)
 {
 	setAdcChannel(channel);
 
 	ADCSRA |= (1<<ADSC);
 	while (0 != (ADCSRA & (1<<ADSC)));
 
-	return ADCH;
+	return ADCL | (ADCH << 8);
 }
 
 // --------------------------------------------------------------------------------
-// Read ADC for light-level channel on channel 0
-uint8_t lastLightLevel(void)
+// Read ADC for light-level on channel 0 (returns a percentage 0.0 - 1.0)
+double lastLightLevel(void)
 {
-	return readChannel(0);
+	return (readChannel(0) >> 2) / 1024.0;
 }
 
 // --------------------------------------------------------------------------------
-// Read ADC for battery voltage on channel 1
+// Read ADC for battery voltage on channel 1.  Returns the battery voltage
+// between 0.0v and 3.0v.
 double lastBatteryLevel(void)
 {
-	uint8_t adc = readChannel(1);
-	double result = 1.1 * adc / 1024.0;
+	uint16_t adc = readChannel(1);
 
-	return result;
+	// convert the ADC reading to the scaled voltage (0v to 1.1v)
+	double sampleVoltage = 1.1 * adc / 1024.0;
+
+	// rescale the sample voltage to the actual battery voltage (1.1v scale to 3.0v scale)
+	double batteryVoltage = (sampleVoltage * 3.0 / 1.1);
+
+	return batteryVoltage;
 }
 
 // --------------------------------------------------------------------------------
@@ -125,7 +131,7 @@ void formatMessage(void)
 	uint8_t light = lastLightLevel();
 	double battery = lastBatteryLevel();
 
-	sprintf(_buff, "h %d %.2f ", light, battery);
+	sprintf_P(_buff, PSTR("h %d %.2f "), light, battery);
 }
 
 // --------------------------------------------------------------------------------
