@@ -91,14 +91,16 @@ uint16_t readChannel(uint8_t channel)
 	ADCSRA |= (1<<ADSC);
 	while (0 != (ADCSRA & (1<<ADSC)));
 
-	return ADCL | (ADCH << 8);
+	return (ADCL | (ADCH << 8));
 }
 
 // --------------------------------------------------------------------------------
 // Read ADC for light-level on channel 0 (returns a percentage 0.0 - 1.0)
 double lastLightLevel(void)
 {
-	return (readChannel(0) >> 2) / 1024.0;
+	uint16_t value = readChannel(0);
+
+	return value / 1024.0;
 }
 
 // --------------------------------------------------------------------------------
@@ -106,10 +108,10 @@ double lastLightLevel(void)
 // between 0.0v and 3.0v.
 double lastBatteryLevel(void)
 {
-	uint16_t adc = readChannel(1);
+	uint16_t value = readChannel(1);
 
 	// convert the ADC reading to the scaled voltage (0v to 1.1v)
-	double sampleVoltage = 1.1 * adc / 1024.0;
+	double sampleVoltage = 1.1 * value / 1024.0;
 
 	// rescale the sample voltage to the actual battery voltage (1.1v scale to 3.0v scale)
 	double batteryVoltage = (sampleVoltage * 3.0 / 1.1);
