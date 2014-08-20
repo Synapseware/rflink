@@ -3,8 +3,12 @@
 
 static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
-static double _batteryLevels[4];
-static double _lightLevels[4];
+static double _batteryLevels[8];
+const uint8_t _batteryLevelsLen = sizeof(_batteryLevels) / sizeof(double);
+static double _lightLevels[8];
+const uint8_t _lightLevelsLen = sizeof(_lightLevels) / sizeof(double);
+
+volatile uint16_t _lastAdcValue = 0;
 
 
 // --------------------------------------------------------------------------------
@@ -37,7 +41,7 @@ void init_adc(void)
 			(1<<ADSC) |
 			(0<<ADATE) |
 			(1<<ADIF) |
-			(0<<ADIE) |
+			(1<<ADIE) |
 			(1<<ADPS2) |	// prescale should be ~160 (14.75MHz/125KHz = 118KHz)
 			(0<<ADPS1) |
 			(1<<ADPS0);
@@ -77,6 +81,9 @@ void init(void)
 
 	uart_init();
 
+	sleep_enable();
+	set_sleep_mode(SLEEP_MODE_ADC);
+
 	sei();
 }
 
@@ -94,10 +101,12 @@ uint16_t readChannel(uint8_t channel)
 {
 	setAdcChannel(channel);
 
-	ADCSRA |= (1<<ADSC);
-	while (0 != (ADCSRA & (1<<ADSC)));
+	//ADCSRA |= (1<<ADSC);
+	//while (0 != (ADCSRA & (1<<ADSC)));
+	sleep_cpu(); // ISR will wake up CPU
 
-	return (ADCL | (ADCH << 8));
+	return _lastAdcValue;
+	//return (ADCL | (ADCH << 8));
 }
 
 // --------------------------------------------------------------------------------
@@ -105,27 +114,13 @@ uint16_t readChannel(uint8_t channel)
 double getLightLevel(void)
 {
 	double value = 0.0;
-	uint8_t count = 0;
 
-	for (uint8_t index = 0; index < sizeof(_lightLevels) / sizeof(double); index++)
+	for (uint8_t index = 0; index < _lightLevelsLen; index++)
 	{
-		if (_lightLevels[index] != 0.0)
-		{
-			value += _lightLevels[index];
-			count++;
-		}
+		value += _lightLevels[index];
 	}
 
-	// only compute the average if we have enough data
-	if (count == 8)
-		return value / 8;
-	
-	// return the most recent sample if we have data but not enough for the average
-	if (count > 0)
-		return _lightLevels[count - 1];
-
-	// just return 0 since no values have been sampled yet
-	return 0.0;
+	return value / _lightLevelsLen;
 }
 
 // --------------------------------------------------------------------------------
@@ -134,7 +129,7 @@ void saveLightLevel(double value)
 {
 	static uint8_t index = 0;
 	_lightLevels[index] = value;
-	index += (index & 0x03);
+	index += (index & (_lightLevelsLen - 1));
 }
 
 // --------------------------------------------------------------------------------
@@ -147,31 +142,17 @@ double sampleLightLevel(void)
 }
 
 // --------------------------------------------------------------------------------
-// returns the moving-average of all the sampled battery voltages
+// returns the average of all the sampled battery voltages
 double getBatteryLevel(void)
 {
 	double value = 0.0;
-	uint8_t count = 0;
 
-	for (uint8_t index = 0; index < sizeof(_batteryLevels) / sizeof(double); index++)
+	for (uint8_t index = 0; index < _batteryLevelsLen; index++)
 	{
-		if (_batteryLevels[index] != 0.0)
-		{
-			value += _batteryLevels[index];
-			count++;
-		}
+		value += _batteryLevels[index];
 	}
 
-	// only compute the average if we have enough data
-	if (count == 8)
-		return value / 8;
-	
-	// return the most recent sample if we have data but not enough for the average
-	if (count > 0)
-		return _batteryLevels[count - 1];
-
-	// just return 0 since no values have been sampled yet
-	return 0.0;
+	return value / _batteryLevelsLen;
 }
 
 // --------------------------------------------------------------------------------
@@ -179,8 +160,8 @@ double getBatteryLevel(void)
 void saveBatteryLevel(double value)
 {
 	static uint8_t index = 0;
-	_batteryLevels[index] = value;
-	index += (index & 0x03);
+	_batteryLevels[index++] = value;
+	index &= _batteryLevelsLen - 1;
 }
 
 // --------------------------------------------------------------------------------
@@ -201,7 +182,7 @@ double sampleBatteryVoltage(void)
 
 // --------------------------------------------------------------------------------
 // Starts the light level sampling cycle
-void processLightLevel(eventState_t state)
+void lightLevelHandler(eventState_t state)
 {
 	double result = sampleLightLevel();
 
@@ -210,7 +191,7 @@ void processLightLevel(eventState_t state)
 
 // --------------------------------------------------------------------------------
 // Starts the battery level sampling cycle
-void processBatteryLevel(eventState_t state)
+void batteryLevelHandler(eventState_t state)
 {
 	double result = sampleBatteryVoltage();
 
@@ -220,14 +201,6 @@ void processBatteryLevel(eventState_t state)
 // --------------------------------------------------------------------------------
 void formatMessage(void)
 {
-/*
-	_buff[0]	= 'h';
-	_buff[1]	= sizeof(_buff) - 1;
-	_buff[2]	= lastLightLevel();
-	_buff[3]	= sampleBatteryVoltage();
-	_buff[4]	= '\n';
-	_buff[5]	= 0;
-*/
 	double light = getLightLevel();
 	double battery = getBatteryLevel();
 
@@ -263,8 +236,8 @@ int main(void)
 	registerEvent(LEDOn, SAMPLE_RATE, 0);
 	registerEvent(LEDOff, SAMPLE_RATE * 0.1, 0);
 
-	registerEvent(processBatteryLevel, SAMPLE_RATE, 0);
-	registerEvent(processLightLevel, SAMPLE_RATE, 0);
+	registerEvent(batteryLevelHandler, SAMPLE_RATE, 0);
+	registerEvent(lightLevelHandler, SAMPLE_RATE, 0);
 
 	registerOneShot(sendMessage, SAMPLE_RATE, 0);
 
@@ -281,4 +254,11 @@ int main(void)
 ISR(TIMER1_COMPA_vect)
 {
 	eventSync();
+}
+
+// --------------------------------------------------------------------------------
+// ADC conversion complete
+ISR(ADC_vect)
+{
+	_lastAdcValue = (ADCL | (ADCH << 8));
 }

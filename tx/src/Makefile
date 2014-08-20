@@ -47,7 +47,7 @@
 # Build variables
 SAMPLE_RATE = 2048
 MAX_EVENT_RECORDS = 8
-BAUD = 1200
+BAUD = 2400
 
 
 # MCU name

@@ -6,6 +6,7 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <avr/power.h>
+#include <avr/sleep.h>
 
 #include <utils.h>
 #include <events/events.h>
