@@ -3,18 +3,23 @@
 
 static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
+static double _batteryLevels[4];
+static double _lightLevels[4];
 
 
 // --------------------------------------------------------------------------------
+// turn the LED off
 void LEDOff(eventState_t state)
 {
+	// a logical 1 turns off the LED
 	PORTB |= (1<<PORTB0);
 }
 
 // --------------------------------------------------------------------------------
-// toggle the LED pin
+// turn the LED on
 void LEDOn(eventState_t state)
 {
+	// a logical 0 turns on the LED
 	PORTB &= ~(1<<PORTB0);
 }
 
@@ -79,6 +84,7 @@ void init(void)
 // Changes the ADC input channel
 void setAdcChannel(uint8_t channel)
 {
+	// set the ADMUX bits for the specified channel
 	ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
 }
 
@@ -95,8 +101,45 @@ uint16_t readChannel(uint8_t channel)
 }
 
 // --------------------------------------------------------------------------------
+// returns the moving-average of all the sampled battery voltages
+double getLightLevel(void)
+{
+	double value = 0.0;
+	uint8_t count = 0;
+
+	for (uint8_t index = 0; index < sizeof(_lightLevels) / sizeof(double); index++)
+	{
+		if (_lightLevels[index] != 0.0)
+		{
+			value += _lightLevels[index];
+			count++;
+		}
+	}
+
+	// only compute the average if we have enough data
+	if (count == 8)
+		return value / 8;
+	
+	// return the most recent sample if we have data but not enough for the average
+	if (count > 0)
+		return _lightLevels[count - 1];
+
+	// just return 0 since no values have been sampled yet
+	return 0.0;
+}
+
+// --------------------------------------------------------------------------------
+// Saves the most recent light level
+void saveLightLevel(double value)
+{
+	static uint8_t index = 0;
+	_lightLevels[index] = value;
+	index += (index & 0x03);
+}
+
+// --------------------------------------------------------------------------------
 // Read ADC for light-level on channel 0 (returns a percentage 0.0 - 1.0)
-double lastLightLevel(void)
+double sampleLightLevel(void)
 {
 	uint16_t value = readChannel(0);
 
@@ -104,9 +147,46 @@ double lastLightLevel(void)
 }
 
 // --------------------------------------------------------------------------------
+// returns the moving-average of all the sampled battery voltages
+double getBatteryLevel(void)
+{
+	double value = 0.0;
+	uint8_t count = 0;
+
+	for (uint8_t index = 0; index < sizeof(_batteryLevels) / sizeof(double); index++)
+	{
+		if (_batteryLevels[index] != 0.0)
+		{
+			value += _batteryLevels[index];
+			count++;
+		}
+	}
+
+	// only compute the average if we have enough data
+	if (count == 8)
+		return value / 8;
+	
+	// return the most recent sample if we have data but not enough for the average
+	if (count > 0)
+		return _batteryLevels[count - 1];
+
+	// just return 0 since no values have been sampled yet
+	return 0.0;
+}
+
+// --------------------------------------------------------------------------------
+// Saves the most recent battery voltage
+void saveBatteryLevel(double value)
+{
+	static uint8_t index = 0;
+	_batteryLevels[index] = value;
+	index += (index & 0x03);
+}
+
+// --------------------------------------------------------------------------------
 // Read ADC for battery voltage on channel 1.  Returns the battery voltage
 // between 0.0v and 3.0v.
-double lastBatteryLevel(void)
+double sampleBatteryVoltage(void)
 {
 	uint16_t value = readChannel(1);
 
@@ -120,20 +200,38 @@ double lastBatteryLevel(void)
 }
 
 // --------------------------------------------------------------------------------
+// Starts the light level sampling cycle
+void processLightLevel(eventState_t state)
+{
+	double result = sampleLightLevel();
+
+	saveLightLevel(result);
+}
+
+// --------------------------------------------------------------------------------
+// Starts the battery level sampling cycle
+void processBatteryLevel(eventState_t state)
+{
+	double result = sampleBatteryVoltage();
+
+	saveBatteryLevel(result);
+}
+
+// --------------------------------------------------------------------------------
 void formatMessage(void)
 {
 /*
 	_buff[0]	= 'h';
 	_buff[1]	= sizeof(_buff) - 1;
 	_buff[2]	= lastLightLevel();
-	_buff[3]	= lastBatteryLevel();
+	_buff[3]	= sampleBatteryVoltage();
 	_buff[4]	= '\n';
 	_buff[5]	= 0;
 */
-	uint8_t light = lastLightLevel();
-	double battery = lastBatteryLevel();
+	double light = getLightLevel();
+	double battery = getBatteryLevel();
 
-	sprintf_P(_buff, PSTR("h %d %.2f "), light, battery);
+	sprintf_P(_buff, PSTR("h %.2f %.2f "), light, battery);
 }
 
 // --------------------------------------------------------------------------------
@@ -164,6 +262,9 @@ int main(void)
 	// get most recent sample data
 	registerEvent(LEDOn, SAMPLE_RATE, 0);
 	registerEvent(LEDOff, SAMPLE_RATE * 0.1, 0);
+
+	registerEvent(processBatteryLevel, SAMPLE_RATE, 0);
+	registerEvent(processLightLevel, SAMPLE_RATE, 0);
 
 	registerOneShot(sendMessage, SAMPLE_RATE, 0);
 
