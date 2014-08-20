@@ -3,9 +3,9 @@
 
 static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
-static double _batteryLevels[8];
+static double _batteryLevels[32];
 const uint8_t _batteryLevelsLen = sizeof(_batteryLevels) / sizeof(double);
-static double _lightLevels[8];
+static double _lightLevels[4];
 const uint8_t _lightLevelsLen = sizeof(_lightLevels) / sizeof(double);
 
 volatile uint16_t _lastAdcValue = 0;
