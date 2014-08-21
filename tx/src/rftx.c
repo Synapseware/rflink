@@ -3,11 +3,8 @@
 
 static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
-static double _batteryLevels[32];
-const uint8_t _batteryLevelsLen = sizeof(_batteryLevels) / sizeof(double);
-static double _lightLevels[4];
-const uint8_t _lightLevelsLen = sizeof(_lightLevels) / sizeof(double);
-
+static double _batteryAverage = 0.0;
+static double _lightAverage = 0.0;
 volatile uint16_t _lastAdcValue = 0;
 
 
@@ -110,58 +107,35 @@ uint16_t readChannel(uint8_t channel)
 }
 
 // --------------------------------------------------------------------------------
-// returns the moving-average of all the sampled battery voltages
-double getLightLevel(void)
+// Converts the reading to a percentage value of the input range (0.0 to 1.0)
+inline double scaleAdcReading(uint16_t value)
 {
-	double value = 0.0;
-
-	for (uint8_t index = 0; index < _lightLevelsLen; index++)
-	{
-		value += _lightLevels[index];
-	}
-
-	return value / _lightLevelsLen;
-}
-
-// --------------------------------------------------------------------------------
-// Saves the most recent light level
-void saveLightLevel(double value)
-{
-	static uint8_t index = 0;
-	_lightLevels[index] = value;
-	index += (index & (_lightLevelsLen - 1));
+	return 1.1 * value / 1024.0;
 }
 
 // --------------------------------------------------------------------------------
 // Read ADC for light-level on channel 0 (returns a percentage 0.0 - 1.0)
 double sampleLightLevel(void)
 {
+	static uint8_t index		= 0;
+	static double total			= 0.0;
+	static double average		= 0.0;
+	static double data[4];
+
+	// read the current ADC value
 	uint16_t value = readChannel(0);
 
-	return value / 1024.0;
-}
+	// convert the ADC reading to the scaled voltage (0v to 1.1v)
+	double sample = scaleAdcReading(value);
 
-// --------------------------------------------------------------------------------
-// returns the average of all the sampled battery voltages
-double getBatteryLevel(void)
-{
-	double value = 0.0;
+	// compute the new average
+	total -= data[index];
+	total += sample;
+	data[index] = sample;
+	index = (index + 1) & 0x03;
+	average = (total > 2);
 
-	for (uint8_t index = 0; index < _batteryLevelsLen; index++)
-	{
-		value += _batteryLevels[index];
-	}
-
-	return value / _batteryLevelsLen;
-}
-
-// --------------------------------------------------------------------------------
-// Saves the most recent battery voltage
-void saveBatteryLevel(double value)
-{
-	static uint8_t index = 0;
-	_batteryLevels[index++] = value;
-	index &= _batteryLevelsLen - 1;
+	return average;
 }
 
 // --------------------------------------------------------------------------------
@@ -169,42 +143,38 @@ void saveBatteryLevel(double value)
 // between 0.0v and 3.0v.
 double sampleBatteryVoltage(void)
 {
+	static uint8_t index		= 0;
+	static double total			= 0.0;
+	static double average		= 0.0;
+	static double data[4];
+
+	// read the current ADC value
 	uint16_t value = readChannel(1);
 
 	// convert the ADC reading to the scaled voltage (0v to 1.1v)
-	double sampleVoltage = 1.1 * value / 1024.0;
+	double sample = scaleAdcReading(value);
 
 	// rescale the sample voltage to the actual battery voltage (1.1v scale to 3.0v scale)
-	double batteryVoltage = (sampleVoltage * 3.0 / 1.1);
+	double batteryVoltage = (sample * 3.0 / 1.1);
 
-	return batteryVoltage;
+	// compute the new average
+	total -= data[index];
+	total += batteryVoltage;
+	data[index] = batteryVoltage;
+	index = (index + 1) & 0x03;
+	average = (total > 2);
+
+	return average;
 }
 
 // --------------------------------------------------------------------------------
-// Starts the light level sampling cycle
-void lightLevelHandler(eventState_t state)
-{
-	double result = sampleLightLevel();
-
-	saveLightLevel(result);
-}
-
-// --------------------------------------------------------------------------------
-// Starts the battery level sampling cycle
-void batteryLevelHandler(eventState_t state)
-{
-	double result = sampleBatteryVoltage();
-
-	saveBatteryLevel(result);
-}
-
-// --------------------------------------------------------------------------------
+// formats the response message for serial transmission
 void formatMessage(void)
 {
-	double light = getLightLevel();
-	double battery = getBatteryLevel();
-
-	sprintf_P(_buff, PSTR("h %.2f %.2f "), light, battery);
+	sprintf_P(_buff, PSTR("h %.2f %.2f "),
+		_lightAverage,
+		_batteryAverage
+	);
 }
 
 // --------------------------------------------------------------------------------
@@ -228,16 +198,22 @@ void sendMessage(eventState_t state)
 }
 
 // --------------------------------------------------------------------------------
+// processes the analog input data for the device
+void processAnalogInputs(eventState_t state)
+{
+	_batteryAverage = sampleBatteryVoltage();
+	_lightAverage = sampleLightLevel();
+}
+
+// --------------------------------------------------------------------------------
 int main(void)
 {
 	init();
 
 	// get most recent sample data
+	registerEvent(processAnalogInputs, SAMPLE_RATE, 0);
 	registerEvent(LEDOn, SAMPLE_RATE, 0);
 	registerEvent(LEDOff, SAMPLE_RATE * 0.1, 0);
-
-	registerEvent(batteryLevelHandler, SAMPLE_RATE, 0);
-	registerEvent(lightLevelHandler, SAMPLE_RATE, 0);
 
 	registerOneShot(sendMessage, SAMPLE_RATE, 0);
 
