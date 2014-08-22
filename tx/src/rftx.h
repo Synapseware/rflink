@@ -12,6 +12,6 @@
 #include <events/events.h>
 #include <uart/uart.h>
 
-
+#define SLEEP_FOR_ADC
 
 #endif

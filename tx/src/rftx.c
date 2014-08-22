@@ -78,8 +78,10 @@ void init(void)
 
 	uart_init();
 
+#ifdef SLEEP_FOR_ADC
 	sleep_enable();
 	set_sleep_mode(SLEEP_MODE_ADC);
+#endif
 
 	sei();
 }
@@ -98,12 +100,15 @@ uint16_t readChannel(uint8_t channel)
 {
 	setAdcChannel(channel);
 
-	//ADCSRA |= (1<<ADSC);
-	//while (0 != (ADCSRA & (1<<ADSC)));
+#ifdef SLEEP_FOR_ADC
 	sleep_cpu(); // ISR will wake up CPU
-
 	return _lastAdcValue;
-	//return (ADCL | (ADCH << 8));
+#else
+	ADCSRA |= (1<<ADSC);
+	while (0 != (ADCSRA & (1<<ADSC)));
+
+	return (ADCL | (ADCH << 8));
+#endif
 }
 
 // --------------------------------------------------------------------------------
