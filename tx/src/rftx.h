@@ -14,4 +14,18 @@
 
 #define SLEEP_FOR_ADC
 
+
+#define STATE_VBATT_SET		1
+#define STATE_VBATT_READ	2
+#define STATE_LIGHT_SET		3
+#define STATE_LIGHT_READ	4
+
+#define CHANNEL_LIGHT		0
+#define CHANNEL_VBATT		1
+
+const double	SCALE_VBATT			= 1.1;
+const double	SCALE_LIGHT			= 1.0;
+
+#define ADC_AVERAGE_OVER			8
+
 #endif

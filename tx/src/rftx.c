@@ -94,6 +94,28 @@ void setAdcChannel(uint8_t channel)
 	ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
 }
 
+
+// --------------------------------------------------------------------------------
+// Sets the ADC v-ref to the analog VREF pin, external cap on VREF recommended
+void setAdcVRefToARef(void)
+{
+	ADMUX = (ADMUX & 0x3F) | (0<<REFS1) | (0<<REFS0);
+}
+
+// --------------------------------------------------------------------------------
+// Sets the ADC v-ref to AVCC
+void setAdcVRefToAVCC(void)
+{
+	ADMUX = (ADMUX & 0x3F) | (0<<REFS1) | (1<<REFS0);
+}
+
+// --------------------------------------------------------------------------------
+// Sets the ADC v-ref to the internal 1.1v
+void setAdcVRefTo1v1(void)
+{
+	ADMUX = (ADMUX & 0x3F) | (1<<REFS1) | (1<<REFS0);
+}
+
 // --------------------------------------------------------------------------------
 // Reads the ADC value for the specified channel
 uint16_t readChannel(uint8_t channel)
@@ -112,64 +134,28 @@ uint16_t readChannel(uint8_t channel)
 }
 
 // --------------------------------------------------------------------------------
+// Reads a fixed number of samples from the ADC and averages the result
+uint16_t getAdcAverage(uint8_t channel)
+{
+	uint16_t	total		= 0;
+	uint8_t		index		= 0;
+
+	while (index < ADC_AVERAGE_OVER)
+	{
+		total += readChannel(channel);
+	}
+
+	total >>= ADC_AVERAGE_OVER;
+
+	return total;
+}
+
+// --------------------------------------------------------------------------------
 // Converts the reading to a percentage value of the input range (0.0 to 1.0)
-inline double scaleAdcReading(uint16_t value)
+inline double scaleAdcReading(uint16_t value, double scale)
 {
-	return 1.1 * value / 1024.0;
-}
-
-// --------------------------------------------------------------------------------
-// Read ADC for light-level on channel 0 (returns a percentage 0.0 - 1.0)
-double sampleLightLevel(void)
-{
-	static uint8_t index		= 0;
-	static double total			= 0.0;
-	static double average		= 0.0;
-	static double data[4];
-
-	// read the current ADC value
-	uint16_t value = readChannel(0);
-
-	// convert the ADC reading to the scaled voltage (0v to 1.1v)
-	double sample = scaleAdcReading(value);
-
-	// compute the new average
-	total -= data[index];
-	total += sample;
-	data[index] = sample;
-	index = (index + 1) & 0x03;
-	average = (total > 2);
-
-	return average;
-}
-
-// --------------------------------------------------------------------------------
-// Read ADC for battery voltage on channel 1.  Returns the battery voltage
-// between 0.0v and 3.0v.
-double sampleBatteryVoltage(void)
-{
-	static uint8_t index		= 0;
-	static double total			= 0.0;
-	static double average		= 0.0;
-	static double data[4];
-
-	// read the current ADC value
-	uint16_t value = readChannel(1);
-
-	// convert the ADC reading to the scaled voltage (0v to 1.1v)
-	double sample = scaleAdcReading(value);
-
-	// rescale the sample voltage to the actual battery voltage (1.1v scale to 3.0v scale)
-	double batteryVoltage = (sample * 3.0 / 1.1);
-
-	// compute the new average
-	total -= data[index];
-	total += batteryVoltage;
-	data[index] = batteryVoltage;
-	index = (index + 1) & 0x03;
-	average = (total > 2);
-
-	return average;
+	// re-scale the ADC reading
+	return scale * value / 1024.0;
 }
 
 // --------------------------------------------------------------------------------
@@ -184,14 +170,6 @@ void formatMessage(void)
 
 // --------------------------------------------------------------------------------
 // Sends the message bytes to the UART
-void sendMessageHandler(void)
-{
-	uint8_t i = 0;
-	while (i < sizeof(_buff) / sizeof(char))
-	{
-		i--;
-	}
-}
 void sendMessage(eventState_t state)
 {
 	formatMessage();
@@ -203,11 +181,39 @@ void sendMessage(eventState_t state)
 }
 
 // --------------------------------------------------------------------------------
-// processes the analog input data for the device
-void processAnalogInputs(eventState_t state)
+// Processes the inputs using a state machine
+void processAnalogInputs(eventState_t t)
 {
-	_batteryAverage = sampleBatteryVoltage();
-	_lightAverage = sampleLightLevel();
+	static uint8_t state	= STATE_VBATT_SET;
+
+	uint16_t	reading		= 0;
+
+	switch (state)
+	{
+		case STATE_VBATT_SET:
+			setAdcVRefTo1v1();
+			readChannel(CHANNEL_VBATT);
+			state = STATE_VBATT_READ;
+			break;
+
+		case STATE_VBATT_READ:
+			reading = getAdcAverage(CHANNEL_VBATT);
+			_batteryAverage	= scaleAdcReading(reading, SCALE_VBATT);
+			state = STATE_LIGHT_SET;
+			break;
+
+		case STATE_LIGHT_SET:
+			setAdcVRefToAVCC();
+			readChannel(CHANNEL_LIGHT);
+			state = STATE_LIGHT_READ;
+			break;
+
+		case STATE_LIGHT_READ:
+			reading = getAdcAverage(CHANNEL_LIGHT);
+			_lightAverage = scaleAdcReading(reading, SCALE_LIGHT);
+			state = STATE_VBATT_SET;
+			break;
+	}
 }
 
 // --------------------------------------------------------------------------------
@@ -216,7 +222,7 @@ int main(void)
 	init();
 
 	// get most recent sample data
-	registerEvent(processAnalogInputs, SAMPLE_RATE, 0);
+	registerEvent(processAnalogInputs, SAMPLE_RATE / 16, 0);
 	registerEvent(LEDOn, SAMPLE_RATE, 0);
 	registerEvent(LEDOff, SAMPLE_RATE * 0.1, 0);
 
@@ -234,6 +240,7 @@ int main(void)
 // Should be running @ 8.000kHz - this is the event sync driver method
 ISR(TIMER1_COMPA_vect)
 {
+	// event tick signal
 	eventSync();
 }
 
@@ -241,5 +248,6 @@ ISR(TIMER1_COMPA_vect)
 // ADC conversion complete
 ISR(ADC_vect)
 {
+	// save the ADC reading in a global var
 	_lastAdcValue = (ADCL | (ADCH << 8));
 }

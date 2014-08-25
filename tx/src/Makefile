@@ -45,7 +45,7 @@
 
 
 # Build variables
-SAMPLE_RATE = 2048
+SAMPLE_RATE = 512
 MAX_EVENT_RECORDS = 8
 BAUD = 2400
 
@@ -451,8 +451,8 @@ sizebefore:
 	2>/dev/null; echo; fi
 
 sizeafter:
-	@if test -f $(TARGET).elf; then echo; echo $(MSG_SIZE_AFTER); $(ELFSIZE); \
-	2>/dev/null; echo; fi
+	@if test -f $(TARGET).elf; then echo $(MSG_SIZE_AFTER); $(ELFSIZE); \
+	2>/dev/null; fi
 
 
 
