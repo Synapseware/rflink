@@ -16,36 +16,6 @@ void ToggleLED(eventState_t state)
 }
 
 // --------------------------------------------------------------------------------
-void init(void)
-{
-	PORTB |= (1<<LED_PIN);
-	DDRB |= (1<<LED_PIN);
-
-	power_timer1_enable();
-
-	OCR1A	=	(F_CPU / SAMPLE_RATE);
-	TCCR1A	=	0;
-	TCCR1B	=	(1<<WGM12) |	// CTC
-				(1<<CS10);
-	TIMSK1	=	(1<<OCIE1A);
-
-	setTimeBase(SAMPLE_RATE);
-
-	DDRD |= (1<<PORTD1);
-
-	init_adc();
-
-	uart_init();
-
-	#ifdef SLEEP_FOR_ADC
-	sleep_enable();
-	set_sleep_mode(SLEEP_MODE_ADC);
-	#endif
-
-	sei();
-}
-
-// --------------------------------------------------------------------------------
 // formats the response message for serial transmission
 void formatMessage(void)
 {
@@ -61,7 +31,6 @@ void sendMessage(eventState_t state)
 {
 	formatMessage();
 
-	//uartBeginSend(sendMessageHandler);
 	uartSendBuff(_buff, _len);
 }
 
@@ -101,15 +70,53 @@ void processAnalogInputs(eventState_t t)
 }
 
 // --------------------------------------------------------------------------------
+// Registers all the periodic events of interest
+void registerEvents(void)
+{
+	// get most recent sample data
+	registerHighPriorityEvent(ToggleLED, SAMPLE_RATE, 0);
+	registerHighPriorityEvent(ToggleLED, SAMPLE_RATE * 1.25, 0);
+
+	registerEvent(processAnalogInputs, SAMPLE_RATE / 16, 0);
+	registerEvent(sendMessage, SAMPLE_RATE, 0);	
+}
+
+// --------------------------------------------------------------------------------
+void init(void)
+{
+	PORTB |= (1<<LED_PIN);
+	DDRB |= (1<<LED_PIN);
+
+	power_timer1_enable();
+
+	OCR1A	=	(F_CPU / SAMPLE_RATE);
+	TCCR1A	=	0;
+	TCCR1B	=	(1<<WGM12) |	// CTC
+				(1<<CS10);
+	TIMSK1	=	(1<<OCIE1A);
+
+	setTimeBase(SAMPLE_RATE);
+
+	DDRD |= (1<<PORTD1);
+
+	init_adc();
+
+	uart_init();
+
+	#ifdef SLEEP_FOR_ADC
+	sleep_enable();
+	set_sleep_mode(SLEEP_MODE_ADC);
+	#endif
+
+	registerEvents();
+
+	sei();
+}
+
+// --------------------------------------------------------------------------------
 int main(void)
 {
 	init();
-
-	// get most recent sample data
-	registerEvent(ToggleLED, SAMPLE_RATE, 0);
-	registerEvent(processAnalogInputs, SAMPLE_RATE / 16, 0);
-	registerEvent(ToggleLED, SAMPLE_RATE * 1.25, 0);
-	registerEvent(sendMessage, SAMPLE_RATE, 0);
 
 	while(1)
 	{
@@ -125,12 +132,4 @@ ISR(TIMER1_COMPA_vect)
 {
 	// event tick signal
 	eventSync();
-}
-
-// --------------------------------------------------------------------------------
-// ADC conversion complete
-ISR(ADC_vect)
-{
-	// save the ADC reading in a global var
-	_lastAdcValue = (ADCL | (ADCH << 8));
 }

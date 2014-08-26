@@ -28,13 +28,11 @@
 static const double	SCALE_VBATT			= 1.1;
 static const double	SCALE_LIGHT			= 1.0;
 
-static const uint8_t	VREF_AVCC		= 0x00;
-static const uint8_t	VREF_AREF		= 0x01;
-static const uint8_t	VREF_11			= 0x03;
-
 #define SAMPLES_TO_AVERAGE			4
 
 #define LED_PIN			PB0
+
+
 
 
 #endif

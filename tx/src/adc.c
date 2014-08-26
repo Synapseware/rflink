@@ -4,39 +4,6 @@ volatile uint16_t _lastAdcValue = 0;
 
 
 // --------------------------------------------------------------------------------
-// Prepare the ADC for sampling
-void init_adc(void)
-{
-	// prepare ADC
-	ADMUX =	(1<<REFS1) |
-			(1<<REFS0) |
-			(0<<ADLAR);		// right adjust result
-
-	// setup
-	ADCSRA = (1<<ADEN) |
-			(1<<ADSC) |
-			(0<<ADATE) |
-			(1<<ADIF) |
-			(1<<ADIE) |
-			(1<<ADPS2) |	// prescale should be ~160 (14.75MHz/125KHz = 118KHz)
-			(0<<ADPS1) |
-			(1<<ADPS0);
-
-	// setup
-	ADCSRB = (0<<ACME) |
-			(0<<ADTS2) |
-			(0<<ADTS1) |
-			(0<<ADTS0);
-
-	// disable digial inputs
-	DIDR0 &= ~((1<<ADC1D) | (1<<ADC0D));
-
-	// setup the input channels
-	DDRC &= ~((1<<ADC0D) | (1<<ADC1D));
-}
-
-
-// --------------------------------------------------------------------------------
 // Sets the ADC's channel and VREF source
 void setAdcChannelAndVRef(uint8_t channel, uint8_t vref)
 {
@@ -90,3 +57,43 @@ inline double scaleAdcReading(uint16_t value, double scale)
 	return scale * value / 1024.0;
 }
 
+// --------------------------------------------------------------------------------
+// Prepare the ADC for sampling
+void init_adc(void)
+{
+	// prepare ADC
+	ADMUX =	(1<<REFS1) |
+			(1<<REFS0) |
+			(0<<ADLAR);		// right adjust result
+
+	// setup
+	ADCSRA = (1<<ADEN) |
+			(1<<ADSC) |
+			(0<<ADATE) |
+			(1<<ADIF) |
+			(1<<ADIE) |
+			(1<<ADPS2) |	// prescale should be ~160 (14.75MHz/125KHz = 118KHz)
+			(0<<ADPS1) |
+			(1<<ADPS0);
+
+	// setup
+	ADCSRB = (0<<ACME) |
+			(0<<ADTS2) |
+			(0<<ADTS1) |
+			(0<<ADTS0);
+
+	// disable digial inputs
+	DIDR0 &= ~((1<<ADC1D) | (1<<ADC0D));
+
+	// setup the input channels
+	DDRC &= ~((1<<ADC0D) | (1<<ADC1D));
+}
+
+
+// --------------------------------------------------------------------------------
+// ADC conversion complete
+ISR(ADC_vect)
+{
+	// save the ADC reading in a global var
+	_lastAdcValue = (ADCL | (ADCH << 8));
+}
