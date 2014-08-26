@@ -1,17 +1,27 @@
 #include "rftx.h"
 
 
-static char _buff[32];
+static char _buff[64];
 const uint8_t _len = sizeof(_buff) / sizeof(char);
 static double _batteryAverage = 0.0;
 static double _lightAverage = 0.0;
 
 
 // --------------------------------------------------------------------------------
-// Toggles the LED
-void ToggleLED(eventState_t state)
+void LedOn(eventState_t state)
 {
-	// or'ing the PINB port pin actually toggles the output state
+	// LED is active low
+	PORTB &= ~(1<<LED_PIN);
+}
+// --------------------------------------------------------------------------------
+void LedOff(eventState_t state)
+{
+	// bring the output pin high to turn off the LED
+	PORTB |= (1<<LED_PIN);
+}
+
+void ToggleLed(eventState_t state)
+{
 	PINB |= (1<<LED_PIN);
 }
 
@@ -19,7 +29,7 @@ void ToggleLED(eventState_t state)
 // formats the response message for serial transmission
 void formatMessage(void)
 {
-	sprintf_P(_buff, PSTR("h %.2f %.2f "),
+	sprintf_P(_buff, PSTR("Light: %.0f%% Battery: %.2fv \r\n"),
 		_lightAverage,
 		_batteryAverage
 	);
@@ -45,7 +55,6 @@ void processAnalogInputs(eventState_t t)
 	{
 		case STATE_VBATT_SET:
 			setAdcChannelAndVRef(CHANNEL_VBATT, VREF_11);
-			readChannel();
 			state = STATE_VBATT_READ;
 			break;
 
@@ -57,7 +66,6 @@ void processAnalogInputs(eventState_t t)
 
 		case STATE_LIGHT_SET:
 			setAdcChannelAndVRef(CHANNEL_LIGHT, VREF_AREF);
-			readChannel();
 			state = STATE_LIGHT_READ;
 			break;
 
@@ -74,17 +82,18 @@ void processAnalogInputs(eventState_t t)
 void registerEvents(void)
 {
 	// get most recent sample data
-	registerHighPriorityEvent(ToggleLED, SAMPLE_RATE, 0);
-	registerHighPriorityEvent(ToggleLED, SAMPLE_RATE * 1.25, 0);
+	//registerHighPriorityEvent(LedOn, 5, 0);
+	//registerHighPriorityEvent(LedOff, SAMPLE_RATE - 1, 0);
+	//registerHighPriorityEvent(ToggleLed, SAMPLE_RATE / 2, 0);
 
-	registerEvent(processAnalogInputs, SAMPLE_RATE / 16, 0);
+	registerEvent(processAnalogInputs, SAMPLE_RATE / 4, 0);
 	registerEvent(sendMessage, SAMPLE_RATE, 0);	
 }
 
 // --------------------------------------------------------------------------------
 void init(void)
 {
-	PORTB |= (1<<LED_PIN);
+	LedOff(0);
 	DDRB |= (1<<LED_PIN);
 
 	power_timer1_enable();
@@ -102,11 +111,6 @@ void init(void)
 	init_adc();
 
 	uart_init();
-
-	#ifdef SLEEP_FOR_ADC
-	sleep_enable();
-	set_sleep_mode(SLEEP_MODE_ADC);
-	#endif
 
 	registerEvents();
 

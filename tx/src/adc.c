@@ -11,25 +11,33 @@ void setAdcChannelAndVRef(uint8_t channel, uint8_t vref)
 	ADMUX = (ADMUX & 0x30) |
 			(channel & 0x0F) |
 			((vref & 0x03) << 6);
+
+	// read the ADC (discards the result after a channel & vref change)
+	readAdcSample();
 }
 
 // --------------------------------------------------------------------------------
 // Reads the ADC value for the specified channel
-uint16_t readChannel(void)
+uint16_t readAdcSample(void)
 {
-	#ifdef SLEEP_FOR_ADC
+	sleep_cpu(); // ISR will wake up CPU
+	return _lastAdcValue;
+
+/*
+	//#ifdef SLEEP_FOR_ADC
 
 	sleep_cpu(); // ISR will wake up CPU
 	return _lastAdcValue;
 
-	#else
+	//#else
 
-	ADCSRA |= (1<<ADSC);
-	while (0 != (ADCSRA & (1<<ADSC)));
+	//ADCSRA |= (1<<ADSC);
+	//while (0 != (ADCSRA & (1<<ADSC)));
 
-	return (ADCL | (ADCH << 8));
+	//return (ADCL | (ADCH << 8));
 
-	#endif
+	//#endif
+*/
 }
 
 // --------------------------------------------------------------------------------
@@ -37,14 +45,15 @@ uint16_t readChannel(void)
 uint16_t getAdcAverage(uint8_t samples)
 {
 	uint16_t	total		= 0;
+	uint8_t		count		= samples;
 
-	while (samples)
+	while (count > 0)
 	{
-		total += readChannel();
-		samples--;
+		total += readAdcSample();
+		count--;
 	}
 
-	total = (total>>samples);
+	total = total / samples;
 
 	return total;
 }
@@ -54,13 +63,18 @@ uint16_t getAdcAverage(uint8_t samples)
 inline double scaleAdcReading(uint16_t value, double scale)
 {
 	// re-scale the ADC reading
-	return scale * value / 1024.0;
+	return scale * (value / 1024.0);
 }
 
 // --------------------------------------------------------------------------------
 // Prepare the ADC for sampling
 void init_adc(void)
 {
+	power_adc_enable();
+
+	sleep_enable();
+	set_sleep_mode(SLEEP_MODE_ADC);
+
 	// prepare ADC
 	ADMUX =	(1<<REFS1) |
 			(1<<REFS0) |

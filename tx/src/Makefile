@@ -47,7 +47,7 @@
 # Build variables
 SAMPLE_RATE = 512
 MAX_EVENT_RECORDS = 8
-BAUD = 2400
+BAUD = 9600
 
 
 # MCU name
@@ -289,7 +289,8 @@ LDFLAGS += $(LIBS)
 AVRDUDE_PROGRAMMER = stk500
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = com1    # programmer connected to serial device
+# Linux is /dev/ttyACM0 (use "dmesg | grep tty" to find it)
+AVRDUDE_PORT = /dev/ttyACM0    # programmer connected to serial device
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep

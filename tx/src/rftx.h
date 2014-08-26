@@ -14,8 +14,6 @@
 
 #include "adc.h"
 
-#define SLEEP_FOR_ADC
-
 
 #define STATE_VBATT_SET		1
 #define STATE_VBATT_READ	2
@@ -25,10 +23,9 @@
 #define CHANNEL_LIGHT		0
 #define CHANNEL_VBATT		1
 
-static const double	SCALE_VBATT			= 1.1;
-static const double	SCALE_LIGHT			= 1.0;
+static const double	SCALE_VBATT			= 3.0;
+static const double	SCALE_LIGHT			= 100.0;
 
-#define SAMPLES_TO_AVERAGE			4
 
 #define LED_PIN			PB0
 
