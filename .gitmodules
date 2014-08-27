@@ -1,3 +1,6 @@
 [submodule "libs"]
 	path = libs
 	url = git@github.com:Synapseware/libs.git
+[submodule "packages/radiohead"]
+	path = packages/radiohead
+	url = git@github.com:PaulStoffregen/RadioHead.git
