@@ -1,33 +1,39 @@
 #include "rftx.h"
 
 
-static char _buff[64];
-const uint8_t _len = sizeof(_buff) / sizeof(char);
-static double _batteryAverage = 0.0;
-static double _lightAverage = 0.0;
+static	char		_buff[64];
+const	uint8_t		_len				= sizeof(_buff) / sizeof(char);
+static	double		_batteryAverage		= 0.0;
+static	double		_lightAverage		= 0.0;
+
+static	Events		_events(MAX_EVENT_RECORDS);
+static	Adc			_adc;
 
 
 // --------------------------------------------------------------------------------
-void LedOn(eventState_t state)
+static void LedOn(eventState_t state)
 {
 	// LED is active low
 	PORTB &= ~(1<<LED_PIN);
 }
+
 // --------------------------------------------------------------------------------
-void LedOff(eventState_t state)
+static void LedOff(eventState_t state)
 {
 	// bring the output pin high to turn off the LED
 	PORTB |= (1<<LED_PIN);
 }
 
-void ToggleLed(eventState_t state)
+// --------------------------------------------------------------------------------
+static void ToggleLed(eventState_t state)
 {
+
 	PINB |= (1<<LED_PIN);
 }
 
 // --------------------------------------------------------------------------------
 // formats the response message for serial transmission
-void formatMessage(void)
+static void formatMessage(void)
 {
 	sprintf_P(_buff, PSTR("Light: %.0f%% Battery: %.2fv \r\n"),
 		_lightAverage,
@@ -37,16 +43,16 @@ void formatMessage(void)
 
 // --------------------------------------------------------------------------------
 // Sends the message bytes to the UART
-void sendMessage(eventState_t state)
+static void sendMessage(eventState_t state)
 {
 	formatMessage();
 
-	uartSendBuff(_buff, _len);
+//	uartSendBuff(_buff, _len);
 }
 
 // --------------------------------------------------------------------------------
 // Processes the inputs using a state machine
-void processAnalogInputs(eventState_t t)
+static void processAnalogInputs(eventState_t t)
 {
 	static uint8_t	state		= STATE_VBATT_SET;
 	uint16_t		reading		= 0;
@@ -54,24 +60,24 @@ void processAnalogInputs(eventState_t t)
 	switch (state)
 	{
 		case STATE_VBATT_SET:
-			setAdcChannelAndVRef(CHANNEL_VBATT, VREF_11);
+			_adc.setAdcChannelAndVRef(CHANNEL_VBATT, VREF_11);
 			state = STATE_VBATT_READ;
 			break;
 
 		case STATE_VBATT_READ:
-			reading = getAdcAverage(SAMPLES_TO_AVERAGE);
-			_batteryAverage	= scaleAdcReading(reading, SCALE_VBATT);
+			reading = _adc.getAdcAverage(SAMPLES_TO_AVERAGE);
+			_batteryAverage	= _adc.scaleAdcReading(reading, SCALE_VBATT);
 			state = STATE_LIGHT_SET;
 			break;
 
 		case STATE_LIGHT_SET:
-			setAdcChannelAndVRef(CHANNEL_LIGHT, VREF_AREF);
+			_adc.setAdcChannelAndVRef(CHANNEL_LIGHT, VREF_AREF);
 			state = STATE_LIGHT_READ;
 			break;
 
 		case STATE_LIGHT_READ:
-			reading = getAdcAverage(SAMPLES_TO_AVERAGE);
-			_lightAverage = scaleAdcReading(reading, SCALE_LIGHT);
+			reading = _adc.getAdcAverage(SAMPLES_TO_AVERAGE);
+			_lightAverage = _adc.scaleAdcReading(reading, SCALE_LIGHT);
 			state = STATE_VBATT_SET;
 			break;
 	}
@@ -79,19 +85,17 @@ void processAnalogInputs(eventState_t t)
 
 // --------------------------------------------------------------------------------
 // Registers all the periodic events of interest
-void registerEvents(void)
+static void registerEvents(void)
 {
-	// get most recent sample data
-	//registerHighPriorityEvent(LedOn, 5, 0);
-	//registerHighPriorityEvent(LedOff, SAMPLE_RATE - 1, 0);
-	//registerHighPriorityEvent(ToggleLed, SAMPLE_RATE / 2, 0);
+	_events.setTimeBase(SAMPLE_RATE);
 
-	registerEvent(processAnalogInputs, SAMPLE_RATE / 4, 0);
-	registerEvent(sendMessage, SAMPLE_RATE, 0);	
+	// get most recent sample data
+	_events.registerEvent(processAnalogInputs, SAMPLE_RATE / 4, 0);
+	_events.registerEvent(sendMessage, SAMPLE_RATE, 0);	
 }
 
 // --------------------------------------------------------------------------------
-void init(void)
+static void init(void)
 {
 	LedOff(0);
 	DDRB |= (1<<LED_PIN);
@@ -104,13 +108,11 @@ void init(void)
 				(1<<CS10);
 	TIMSK1	=	(1<<OCIE1A);
 
-	setTimeBase(SAMPLE_RATE);
-
 	DDRD |= (1<<PORTD1);
 
-	init_adc();
+	_adc.init();
 
-	uart_init();
+//	uart_init();
 
 	registerEvents();
 
@@ -124,7 +126,7 @@ int main(void)
 
 	while(1)
 	{
-		eventsDoEvents();
+		_events.eventsDoEvents();
 	}
 
 	return 0;
@@ -135,5 +137,16 @@ int main(void)
 ISR(TIMER1_COMPA_vect)
 {
 	// event tick signal
-	eventSync();
+	_events.eventSync();
 }
+
+// --------------------------------------------------------------------------------
+// ADC conversion complete
+ISR(ADC_vect)
+{
+	// save the ADC reading in a global var
+	uint16_t result = (ADCL | (ADCH << 8));
+
+	_adc.conversionComplete(result);
+}
+

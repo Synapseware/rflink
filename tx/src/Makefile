@@ -78,24 +78,17 @@ OBJDIR = .
 
 
 # Shared source code
-SHARED = ../../libs
+LIBS_DIR = ../../libs
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC =	$(TARGET).c                          \
-		adc.c                                \
-	 	$(SHARED)/events/events.c            \
-	 	$(SHARED)/utils.c                    \
-	 	$(SHARED)/uart/uart.c
+SRC =	$(LIBS_DIR)/utils.c
 
-
-# List library files here
-#PRINTF_LIB_MIN = -Wl,-u,vfprintf -lprintf_min
-#LIBS = -Wl,-u,utils -lutils
-#LIBS = -lsyn	# Synapseware library :)
 
 # List C++ source files here. (C dependencies are automatically generated.)
-CPPSRC = 
+CPPSRC = $(TARGET).cpp						\
+		 $(LIBS_DIR)/events/events.cpp		\
+		 $(LIBS_DIR)/builtin/adcutils.cpp
 
 
 # List Assembler source files here.
@@ -106,6 +99,12 @@ CPPSRC =
 #     it will preserve the spelling of the filenames, and gcc itself does
 #     care about how the name is spelled on its command-line.
 ASRC = 
+
+# Shared or user configurable definitions
+SHARED_DEFS = -DMAX_EVENT_RECORDS=$(MAX_EVENT_RECORDS)
+SHARED_DEFS += -DSAMPLE_RATE=$(SAMPLE_RATE)
+SHARED_DEFS += -DBAUD=$(BAUD)
+
 
 
 # Optimization level, can be [0, 1, 2, 3, s]. 
@@ -125,7 +124,7 @@ DEBUG = dwarf-2
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRAINCDIRS = $(SHARED)
+EXTRAINCDIRS = $(LIBS_DIR)
 
 
 # Compiler flag to set the C Standard level.
@@ -138,15 +137,16 @@ CSTANDARD = -std=gnu99
 
 # Place -D or -U options here for C sources
 CDEFS = -DF_CPU=$(F_CPU)UL
-CDEFS += -DMAX_EVENT_RECORDS=$(MAX_EVENT_RECORDS)
-CDEFS += -DSAMPLE_RATE=$(SAMPLE_RATE)
-CDEFS += -DBAUD=$(BAUD)
+CDEFS += $(SHARED_DEFS)
+
 # Place -D or -U options here for ASM sources
 ADEFS = -DF_CPU=$(F_CPU)
+ADEFS += $(SHARED_DEFS$
 
 
 # Place -D or -U options here for C++ sources
 CPPDEFS = -DF_CPU=$(F_CPU)UL
+CPPDEFS += $(SHARED_DEFS)
 #CPPDEFS += -D__STDC_LIMIT_MACROS
 #CPPDEFS += -D__STDC_CONSTANT_MACROS
 
@@ -249,7 +249,7 @@ MATH_LIB = -lm
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRALIBDIRS = $(SHARED)
+EXTRALIBDIRS = $(LIBS_DIR)
 
 
 

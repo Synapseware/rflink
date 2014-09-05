@@ -2,6 +2,7 @@
 #define __RFTX_H_
 
 
+#include <stdio.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -10,9 +11,8 @@
 
 #include <utils.h>
 #include <events/events.h>
-#include <uart/uart.h>
-
-#include "adc.h"
+#include <builtin/adcutils.h>
+//#include <uart/uart.h>
 
 
 #define STATE_VBATT_SET		1
@@ -23,11 +23,12 @@
 #define CHANNEL_LIGHT		0
 #define CHANNEL_VBATT		1
 
-static const double	SCALE_VBATT			= 3.0;
-static const double	SCALE_LIGHT			= 100.0;
+
+#define SCALE_VBATT			3.0
+#define SCALE_LIGHT			100.0
 
 
-#define LED_PIN			PB0
+#define LED_PIN				PB0
 
 
 
