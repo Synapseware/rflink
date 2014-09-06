@@ -12,7 +12,7 @@
 #include <utils.h>
 #include <events/events.h>
 #include <builtin/adcutils.h>
-//#include <uart/uart.h>
+#include <uart/uart.h>
 
 
 #define STATE_VBATT_SET		1

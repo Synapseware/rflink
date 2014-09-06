@@ -88,7 +88,8 @@ SRC =	$(LIBS_DIR)/utils.c
 # List C++ source files here. (C dependencies are automatically generated.)
 CPPSRC = $(TARGET).cpp						\
 		 $(LIBS_DIR)/events/events.cpp		\
-		 $(LIBS_DIR)/builtin/adcutils.cpp
+		 $(LIBS_DIR)/builtin/adcutils.cpp	\
+		 $(LIBS_DIR)/uart/uart.cpp
 
 
 # List Assembler source files here.

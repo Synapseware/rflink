@@ -8,6 +8,7 @@ static	double		_lightAverage		= 0.0;
 
 static	Events		_events(MAX_EVENT_RECORDS);
 static	Adc			_adc;
+static	Uart		_uart;
 
 
 // --------------------------------------------------------------------------------
@@ -47,7 +48,7 @@ static void sendMessage(eventState_t state)
 {
 	formatMessage();
 
-//	uartSendBuff(_buff, _len);
+	_uart.sendBuff(_buff, _len);
 }
 
 // --------------------------------------------------------------------------------
@@ -112,7 +113,7 @@ static void init(void)
 
 	_adc.init();
 
-//	uart_init();
+	_uart.init();
 
 	registerEvents();
 
