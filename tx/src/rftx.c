@@ -82,8 +82,8 @@ void processAnalogInputs(eventState_t t)
 void registerEvents(void)
 {
 	// get most recent sample data
-	//registerHighPriorityEvent(LedOn, 5, 0);
-	//registerHighPriorityEvent(LedOff, SAMPLE_RATE - 1, 0);
+	registerHighPriorityEvent(LedOn, SAMPLE_RATE, 0);
+	registerHighPriorityEvent(LedOff, SAMPLE_RATE + (SAMPLE_RATE * 0.05), 0);
 	//registerHighPriorityEvent(ToggleLed, SAMPLE_RATE / 2, 0);
 
 	registerEvent(processAnalogInputs, SAMPLE_RATE / 4, 0);
